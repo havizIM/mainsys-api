@@ -17,25 +17,25 @@ class DatabaseSeeder extends Seeder
             
             UsersTableSeeder::class,
             AdministratorsTableSeeder::class,
-            // EngineersTableSeeder::class,
+            EngineersTableSeeder::class,
 
-            // PartnersTableSeeder::class,
-            // PartnerUsersTableSeeder::class,
-            // CategoriesTableSeeder::class,
-            // BuildingsTableSeeder::class,
-            // ProceduresTableSeeder::class,
-            // PreventiveProceduresTableSeeder::class,
-            // EquipmentsTableSeeder::class,
+            PartnersTableSeeder::class,
+            PartnerUsersTableSeeder::class,
+            CategoriesTableSeeder::class,
+            BuildingsTableSeeder::class,
+            ProceduresTableSeeder::class,
+            PreventiveProceduresTableSeeder::class,
+            EquipmentsTableSeeder::class,
 
-            // WorkOrdersTableSeeder::class,
-            // SchedulesTableSeeder::class,
-            // PreventiveSchedulesTableSeeder::class,
-            // CorrectiveSchedulesTableSeeder::class,
-            // TeamsTableSeeder::class,
+            WorkOrdersTableSeeder::class,
+            SchedulesTableSeeder::class,
+            PreventiveSchedulesTableSeeder::class,
+            CorrectiveSchedulesTableSeeder::class,
+            TeamsTableSeeder::class,
 
-            // PreventiveReportsTableSeeder::class,
-            // PreventiveReportDetailsTableSeeder::class,
-            // CorrectiveReportsTableSeeder::class,
+            PreventiveReportsTableSeeder::class,
+            PreventiveReportDetailsTableSeeder::class,
+            CorrectiveReportsTableSeeder::class,
         ]);
     }
 }

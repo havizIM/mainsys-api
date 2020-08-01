@@ -20,34 +20,34 @@ class UsersTableSeeder extends Seeder
                 'roles' => 'ADMINISTRATOR',
                 'active' => 'Y',
             ],
-            // [
-            //     'username' => 'devanDP',
-            //     'email' => 'devan@gmail.com',
-            //     'password' => bcrypt('123456'),
-            //     'roles' => 'PARTNER',
-            //     'active' => 'Y',
-            // ],
-            // [
-            //     'username' => 'kalyssaIP',
-            //     'email' => 'kalyssa@gmail.com',
-            //     'password' => bcrypt('123456'),
-            //     'roles' => 'ENGINEER',
-            //     'active' => 'Y',
-            // ],
-            // [
-            //     'username' => 'dianRS',
-            //     'email' => 'dian@gmail.com',
-            //     'password' => bcrypt('123456'),
-            //     'roles' => 'ENGINEER',
-            //     'active' => 'Y',
-            // ],
-            // [
-            //     'username' => 'ferryS',
-            //     'email' => 'ferry@gmail.com',
-            //     'password' => bcrypt('123456'),
-            //     'roles' => 'PARTNER',
-            //     'active' => 'Y',
-            // ],
+            [
+                'username' => 'devanDP',
+                'email' => 'devan@gmail.com',
+                'password' => bcrypt('123456'),
+                'roles' => 'PARTNER',
+                'active' => 'Y',
+            ],
+            [
+                'username' => 'kalyssaIP',
+                'email' => 'kalyssa@gmail.com',
+                'password' => bcrypt('123456'),
+                'roles' => 'ENGINEER',
+                'active' => 'Y',
+            ],
+            [
+                'username' => 'dianRS',
+                'email' => 'dian@gmail.com',
+                'password' => bcrypt('123456'),
+                'roles' => 'ENGINEER',
+                'active' => 'Y',
+            ],
+            [
+                'username' => 'ferryS',
+                'email' => 'ferry@gmail.com',
+                'password' => bcrypt('123456'),
+                'roles' => 'PARTNER',
+                'active' => 'Y',
+            ],
         ]);
     }
 }
