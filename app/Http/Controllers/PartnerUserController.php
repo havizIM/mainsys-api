@@ -140,7 +140,82 @@ class PartnerUserController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $partner_user = PartnerUser::findOrFail($id);
+        $this->authorize('update', $partner_user);
+
+        $validator = Validator::make($request->all(), [
+            'full_name' => 'required|string',
+            'partner_id' => 'required|exists:partners,id',
+            'email' => 'required|string',
+            'phone' => 'required|string',
+            'username' => 'required|string',
+            'active' => 'required|in:Y,N',
+        ]);
+
+        if($validator->fails()){
+            return response()->json([
+                'status' => false,
+                'message' => 'Fields Required',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $user = User::findOrFail($partner_user->user_id);
+            $user->username = $request->username;
+            $user->email = $request->email;
+            $user->active = $request->active;
+            $user->save();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed update user',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        try {
+            $partner_user->full_name = $request->full_name;
+            $partner_user->user_id = $user->id;
+            $partner_user->partner_id = $request->partner_id;
+            $partner_user->position = $request->position;
+            $partner_user->phone = $request->phone;
+            $partner_user->address = $request->address;
+            $partner_user->other_information = $request->other_information;
+            $partner_user->save();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed update partner user',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        try {
+            $log = new Log;
+            $log->user_id = Auth::id();
+            $log->description = 'Update Partner User #'.$partner_user->id;
+            $log->reference_id = $partner_user->id;
+            $log->url = '#/partner/user/'.$partner_user->id;
+
+            $log->save();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed add log',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        DB::commit();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Success add partner user',
+            'results' => $partner_user,
+        ], 200);
     }
 
     /**

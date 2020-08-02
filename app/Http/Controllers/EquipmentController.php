@@ -190,7 +190,86 @@ class EquipmentController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $equipment = Equipment::findOrFail($id);
+        $this->authorize('update', $equipment);
+
+        $validator = Validator::make($request->all(), [
+            'sku' => 'required|string',
+            'equipment_name' => 'required|string',
+            'building_id' => 'required|exists:buildings,id',
+            'category_id' => 'required|exists:categories,id',
+            'procedure_id' => 'required|exists:procedures,id',
+        ]);
+
+        if($validator->fails()){
+            return response()->json([
+                'status' => false,
+                'message' => 'Fields Required',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+
+            $photo = $request->file('photo');
+        
+            if($photo){
+                $name       = $photo->getClientOriginalName();
+                $filename   = pathinfo($name, PATHINFO_FILENAME);
+                $extension  = $photo->getClientOriginalExtension();
+
+                $store_as   = $filename.'_'.time().'.'.$extension;
+
+                $photo->storeAs('public/equipment/', $store_as);
+                $equipment->photo = $store_as;
+            } else {
+                $store_as = NULL;
+            }
+
+            $equipment->sku = $request->sku;
+            $equipment->equipment_name = $request->equipment_name;
+            $equipment->category_id = $request->category_id;
+            $equipment->building_id = $request->building_id;
+            $equipment->procedure_id = $request->procedure_id;
+            $equipment->brand = $request->brand;
+            $equipment->type = $request->type;
+            $equipment->location = $request->location;
+            $equipment->other_information = $request->other_information;
+            $equipment->photo = $store_as;
+            $equipment->update();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed update equipment',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        try {
+            $log = new Log;
+            $log->user_id = Auth::id();
+            $log->description = 'Update Equipment #'.$equipment->id;
+            $log->reference_id = $equipment->id;
+            $log->url = '#/partner/equipment/'.$equipment->id;
+
+            $log->save();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed update log',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        DB::commit();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Success update equipment',
+            'results' => $equipment,
+        ], 200);
     }
 
     /**

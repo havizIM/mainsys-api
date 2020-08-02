@@ -20,13 +20,23 @@ class CategoryController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
         $this->authorize('viewAny', Category::class);
 
+        $search = $request->search;
+        $partner = $request->partner;
+        $limit = $request->limit;
+
         switch(Auth::user()->roles){
             case 'ADMINISTRATOR' :
-
+                 if($limit || $search || $partner){
+                    $category = Category::where(function($query) use($search){
+                        $query->where('category_name', 'like', '%'.$search.'%');
+                    })->where('partner_id', '=', $partner)->with(['partner'])->limit($limit)->get();
+                } else {
+                    $category = Category::with(['partner'])->get();
+                }
             break;
 
             case 'PARTNER' : 
@@ -119,7 +129,15 @@ class CategoryController extends Controller
      */
     public function show($id)
     {
-        //
+        $category = Category::with(['partner'])->findOrFail($id);
+
+        $this->authorize('view', $category);
+        
+        return response()->json([
+            'status' => true,
+            'message' => 'Success fetch category',
+            'results' => $category
+        ]);
     }
 
     /**
@@ -131,7 +149,61 @@ class CategoryController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $category = Category::findOrFail($id);
+        $this->authorize('update', $category);
+
+        $validator = Validator::make($request->all(), [
+            'category_name' => 'required|string',
+            'partner_id' => 'required|exists:partners,id',
+        ]);
+
+        if($validator->fails()){
+            return response()->json([
+                'status' => false,
+                'message' => 'Fields Required',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+
+        try {
+            $category->category_name = $request->category_name;
+            $category->partner_id = $request->partner_id;
+            $category->other_information = $request->other_information;
+            $category->update();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed update category',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        try {
+            $log = new Log;
+            $log->user_id = Auth::id();
+            $log->description = 'Update Category #'.$category->id;
+            $log->reference_id = $category->id;
+            $log->url = '#/partner/'.$category->partner_id;
+
+            $log->save();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed add log',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        DB::commit();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Success add category',
+            'results' => $category,
+        ], 200);
     }
 
     /**

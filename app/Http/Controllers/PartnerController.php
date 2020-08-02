@@ -159,7 +159,86 @@ class PartnerController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $partner = Partner::findOrFail($id);
+        $this->authorize('update', $partner);
+
+        $validator = Validator::make($request->all(), [
+            'partner_name' => 'required|string',
+            'email' => 'required|string',
+            'phone' => 'required|string',
+            'address' => 'required|string',
+            'city_id' => 'required|exists:cities,id',
+            'province_id' => 'required|exists:provinces,id',
+        ]);
+
+        if($validator->fails()){
+            return response()->json([
+                'status' => false,
+                'message' => 'Fields Required',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $logo = $request->file('logo');
+        
+            if($logo){
+                $name       = $logo->getClientOriginalName();
+                $filename   = pathinfo($name, PATHINFO_FILENAME);
+                $extension  = $logo->getClientOriginalExtension();
+
+                $store_as   = $filename.'_'.time().'.'.$extension;
+
+                $logo->storeAs('public/partner/', $store_as);
+                $partner->logo = $store_as;
+            } else {
+                $store_as = NULL;
+            }
+
+            $partner->partner_name = $request->partner_name;
+            $partner->city_id = $request->city_id;
+            $partner->province_id = $request->province_id;
+            $partner->phone = $request->phone;
+            $partner->address = $request->address;
+            $partner->fax = $request->fax;
+            $partner->email = $request->email;
+            $partner->npwp = $request->npwp;
+            $partner->website = $request->website;
+            $partner->other_information = $request->other_information;
+            $partner->update();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed add partner',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        try {
+            $log = new Log;
+            $log->user_id = Auth::id();
+            $log->description = 'Update Partner #'.$partner->id;
+            $log->reference_id = $partner->id;
+            $log->url = '#/partner/'.$partner->id;
+
+            $log->save();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed add log',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        DB::commit();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Success add partner',
+            'results' => $partner,
+        ], 200);
     }
 
     /**

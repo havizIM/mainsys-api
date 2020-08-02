@@ -165,7 +165,99 @@ class EngineerController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $engineer = Engineer::findOrFail($id);
+        $this->authorize('update', $engineer);
+
+        $validator = Validator::make($request->all(), [
+            'full_name' => 'required|string',
+            'email' => 'required|string',
+            'phone' => 'required|string',
+            'address' => 'required|string',
+            'username' => 'required|string',
+            'city_id' => 'required|exists:cities,id',
+            'province_id' => 'required|exists:provinces,id',
+            'active' => 'required|in:Y,N',
+        ]);
+
+        if($validator->fails()){
+            return response()->json([
+                'status' => false,
+                'message' => 'Fields Required',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $user = User::findOrFail($engineer->user_id);
+            $user->username = $request->username;
+            $user->email = $request->email;
+            $user->active = $request->active;
+            $user->update();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed update user',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        try {
+            $photo = $request->file('photo');
+        
+            if($photo){
+                $name       = $photo->getClientOriginalName();
+                $filename   = pathinfo($name, PATHINFO_FILENAME);
+                $extension  = $photo->getClientOriginalExtension();
+
+                $store_as   = $filename.'_'.time().'.'.$extension;
+
+                $photo->storeAs('public/engineer/', $store_as);
+                $engineer->photo = $store_as;
+            } else {
+                $store_as = NULL;
+            }
+
+            $engineer->full_name = $request->full_name;
+            $engineer->user_id = $user->id;
+            $engineer->city_id = $request->city_id;
+            $engineer->province_id = $request->province_id;
+            $engineer->phone = $request->phone;
+            $engineer->address = $request->address;
+            $engineer->other_information = $request->other_information;
+            $engineer->update();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed update engineer',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        try {
+            $log = new Log;
+            $log->user_id = Auth::id();
+            $log->description = 'Update Engineer #'.$engineer->id;
+            $log->reference_id = $engineer->id;
+            $log->url = '#/engineer/'.$engineer->id;
+
+            $log->save();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed add log',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        DB::commit();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Success update engineer',
+            'results' => $engineer,
+        ], 200);
     }
 
     /**

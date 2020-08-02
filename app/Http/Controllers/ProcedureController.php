@@ -20,13 +20,24 @@ class ProcedureController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
         $this->authorize('viewAny', Procedure::class);
+
+        $search = $request->search;
+        $partner = $request->partner;
+        $limit = $request->limit;
         
         switch(Auth::user()->roles){
             case 'ADMINISTRATOR' :
-
+                 if($limit || $search || $partner){
+                    $procedure = Procedure::where(function($query) use($search){
+                        $query->where('identifier_name', 'like', '%'.$search.'%')
+                              ->orWhere('type', 'like', '%'.$search.'%');
+                    })->where('partner_id', '=', $partner)->with(['preventive_procedures'])->limit($limit)->get();
+                } else {
+                    $procedure = Procedure::with(['preventive_procedures'])->get();
+                }
             break;
 
             case 'PARTNER' : 
@@ -174,7 +185,85 @@ class ProcedureController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $procedure = Procedure::findOrFail($id);
+        $this->authorize('update', $procedure);
+
+        $validator = Validator::make($request->all(), [
+            'identifier_name' => 'required|string',
+            'partner_id' => 'required|exists:partners,id',
+            'description' => 'required|array',
+            'description.*' => 'required|string',
+            'periode' => 'required|array',
+            'periode.*' => 'required|string',
+        ]);
+
+        if($validator->fails()){
+            return response()->json([
+                'status' => false,
+                'message' => 'Fields Required',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $procedure->partner_id = $request->partner_id;
+            $procedure->identifier_name = $request->identifier_name;
+            $procedure->type = $request->type;
+            $procedure->other_information = $request->other_information;
+            $procedure->update();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed update procedure',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+        
+        $procedure->preventive_procedures()->delete();
+
+        foreach($request['description'] as $key => $val){
+            try {
+                $preventive_procedure = new PreventiveProcedure;
+                $preventive_procedure->procedure_id = $procedure->id;
+                $preventive_procedure->description = $request['description'][$key];
+                $preventive_procedure->periode = $request['periode'][$key];
+                $preventive_procedure->tools = $request['tools'][$key];
+                $preventive_procedure->save();
+            } catch (\Exception $e) {
+                DB::rollback();
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Failed add preventive procedure',
+                    'error' => $e->getMessage()
+                ], 500);
+            }
+        }
+
+        try {
+            $log = new Log;
+            $log->user_id = Auth::id();
+            $log->description = 'Update Procedure #'.$procedure->id;
+            $log->reference_id = $procedure->id;
+            $log->url = '#/partner/procedure/'.$procedure->id;
+
+            $log->save();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed add log',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        DB::commit();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Success add procedure',
+            'results' => $procedure,
+        ], 200);
     }
 
     /**

@@ -167,7 +167,102 @@ class AdministratorController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $administrator = Administrator::findOrFail($id);
+
+        $this->authorize('update', $administrator);
+
+        $validator = Validator::make($request->all(), [
+            'full_name' => 'required|string',
+            'email' => 'required|string',
+            'phone' => 'required|string',
+            'address' => 'required|string',
+            'username' => 'required|string',
+            'city_id' => 'required|exists:cities,id',
+            'province_id' => 'required|exists:provinces,id',
+            'active' => 'required|in:Y,N',
+            'level' => 'required|in:ADMIN,MANAGER',
+        ]);
+
+        if($validator->fails()){
+            return response()->json([
+                'status' => false,
+                'message' => 'Fields Required',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $user = User::findOrFail($administrator->user_id);
+            $user->username = $request->username;
+            $user->email = $request->email;
+            $user->active = $request->active;
+            $user->update();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed update user',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        try {
+            $photo = $request->file('photo');
+        
+            if($photo){
+                $name       = $photo->getClientOriginalName();
+                $filename   = pathinfo($name, PATHINFO_FILENAME);
+                $extension  = $photo->getClientOriginalExtension();
+
+                $store_as   = $filename.'_'.time().'.'.$extension;
+
+                $photo->storeAs('public/administrator/', $store_as);
+                $administrator->photo = $store_as;
+            } else {
+                $store_as = NULL;
+            }
+
+            $administrator->full_name = $request->full_name;
+            $administrator->user_id = $user->id;
+            $administrator->city_id = $request->city_id;
+            $administrator->province_id = $request->province_id;
+            $administrator->phone = $request->phone;
+            $administrator->address = $request->address;
+            $administrator->level = $request->level;
+            $administrator->other_information = $request->other_information;
+            $administrator->update();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed add administrator',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        try {
+            $log = new Log;
+            $log->user_id = Auth::id();
+            $log->description = 'Update Administrator #'.$administrator->id;
+            $log->reference_id = $administrator->id;
+            $log->url = '#/administrator/'.$administrator->id;
+
+            $log->save();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed add log',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        DB::commit();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Success update administrator',
+            'results' => $administrator,
+        ], 200);
     }
 
     /**

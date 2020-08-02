@@ -189,7 +189,74 @@ class BuildingController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $building = Building::findOrFail($id);
+        $this->authorize('update', $building);
+
+        $validator = Validator::make($request->all(), [
+            'building_name' => 'required|string',
+            'partner_id' => 'required|exists:partners,id',
+            'phone' => 'required|string',
+            'address' => 'required|string',
+            'city_id' => 'required|exists:cities,id',
+            'province_id' => 'required|exists:provinces,id'
+        ]);
+
+        if($validator->fails()){
+            return response()->json([
+                'status' => false,
+                'message' => 'Fields Required',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $building->building_name = $request->building_name;
+            $building->building_code = Help::numberCode('BD', 'buildings', 'building_code');
+            $building->type = $request->type;
+            $building->phone = $request->phone;
+            $building->fax = $request->fax;
+            $building->email = $request->email;
+            $building->longitude = $request->longitude;
+            $building->latitude = $request->latitude;
+            $building->address = $request->address;
+            $building->city_id = $request->city_id;
+            $building->province_id = $request->province_id;
+            $building->partner_id = $request->partner_id;
+            $building->other_information = $request->other_information;
+            $building->update();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed update building',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        try {
+            $log = new Log;
+            $log->user_id = Auth::id();
+            $log->description = 'Update Building #'.$building->id;
+            $log->reference_id = $building->id;
+            $log->url = '#/partner/building/'.$building->id;
+
+            $log->save();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed update log',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        DB::commit();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Success update building',
+            'results' => $building,
+        ], 200);
     }
 
     /**
