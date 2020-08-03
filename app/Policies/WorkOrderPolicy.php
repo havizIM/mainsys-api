@@ -53,7 +53,7 @@ class WorkOrderPolicy
      */
     public function update(User $user, WorkOrder $workOrder)
     {
-        return $user->roles == 'ADMINISTRATOR';
+        return $user->roles == 'PARTNER';
     }
 
     /**

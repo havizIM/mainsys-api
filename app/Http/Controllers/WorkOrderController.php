@@ -183,7 +183,89 @@ class WorkOrderController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $work_order = WorkOrder::findOrFail($id);
+        $this->authorize('update', $work_order);
+
+        $validator = Validator::make($request->all(), [
+            'building_id' => 'required|exists:buildings,id',
+            'date' => 'required|date_format:Y-m-d',
+            'description' => 'required|string',
+        ]);
+
+        if($validator->fails()){
+            return response()->json([
+                'status' => false,
+                'message' => 'Fields Required',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $work_order->building_id = $request->building_id;
+            $work_order->equipment_id = $request->equipment_id;
+            $work_order->date = $request->date;
+            $work_order->wo_number = Help::dateCode('WO', 'work_orders', 'wo_number');
+            $work_order->description = $request->description;
+            $work_order->update();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed update work order',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        $work_order->photos()->delete();
+        
+        $photo = $request->file('photo');
+        foreach($request['photo'] as $key => $val){
+            try {
+                
+                $name       = $photo[$key]->getClientOriginalName();
+                $filename   = pathinfo($name, PATHINFO_FILENAME);
+                $extension  = $photo[$key]->getClientOriginalExtension();
+                $store_as   = $filename.'_'.time().'.'.$extension;
+                $photo[$key]->storeAs('public/work_order/'.$work_order->id.'/', $store_as);
+
+                $work_order_photo = new WorkOrderPhoto;
+                $work_order_photo->work_order_id = $work_order->id;
+                $work_order_photo->photo = $store_as;
+                $work_order_photo->save();
+            } catch (\Exception $e) {
+                DB::rollback();
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Failed add work order photo',
+                    'error' => $e->getMessage()
+                ], 500);
+            }
+        }
+
+        try {
+            $log = new Log;
+            $log->user_id = Auth::id();
+            $log->description = 'Update Work Order #'.$work_order->id;
+            $log->reference_id = $work_order->id;
+            $log->url = '#/work_order/'.$work_order->id;
+
+            $log->save();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed add log',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        DB::commit();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Success update work order',
+            'results' => $work_order,
+        ], 200);
     }
 
     /**

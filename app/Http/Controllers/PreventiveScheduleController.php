@@ -207,7 +207,106 @@ class PreventiveScheduleController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $schedule = Schedule::findOrFail($id);
+        $this->authorize('update', $schedule);
+
+        $validator = Validator::make($request->all(), [
+            'date' => 'required|date_format:Y-m-d',
+            'building_id' => 'required|exists:buildings,id',
+            'estimate' => 'required|string',
+            'engineer' => 'required|array',
+            'engineer.*' => 'required|string',
+            'equipment' => 'required|array',
+            'equipment.*' => 'required|string',
+        ]);
+
+        if($validator->fails()){
+            return response()->json([
+                'status' => false,
+                'message' => 'Fields Required',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $schedule->building_id = $request->building_id;
+            $schedule->date = $request->date;
+            $schedule->time = $request->time;
+            $schedule->estimate = $request->estimate;
+            $schedule->shift = $request->shift;
+            $schedule->description = $request->description;
+            $schedule->type = 'Preventive';
+            $schedule->submit = 'Y';
+            $schedule->update();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed update preventive schedule',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        $schedule->preventives()->delete();
+
+        foreach($request->equipment as $key => $val){
+            try {
+                $preventive_schedule = new PreventiveSchedule;
+                $preventive_schedule->schedule_id = $schedule->id;
+                $preventive_schedule->equipment_id = $val;
+                $preventive_schedule->save();
+            } catch (\Exception $e) {
+                DB::rollback();
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Failed add preventive schedule',
+                    'error' => $e->getMessage()
+                ], 500);
+            }
+        }
+
+        $schedule->teams()->delete();
+
+        foreach($request->engineer as $key => $val){
+            try {
+                $team = new Team;
+                $team->schedule_id = $schedule->id;
+                $team->engineer_id = $val;
+                $team->save();
+            } catch (\Exception $e) {
+                DB::rollback();
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Failed add teams',
+                    'error' => $e->getMessage()
+                ], 500);
+            }
+        }
+
+        try {
+            $log = new Log;
+            $log->user_id = Auth::id();
+            $log->description = 'Update Preventive Schedule #'.$schedule->id;
+            $log->reference_id = $schedule->id;
+            $log->url = '#/preventive_schedule/'.$schedule->id;
+
+            $log->save();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed add log',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        DB::commit();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Success update schedule',
+            'results' => $schedule,
+        ], 200);
     }
 
     /**

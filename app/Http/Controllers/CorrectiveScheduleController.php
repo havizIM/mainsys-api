@@ -200,7 +200,102 @@ class CorrectiveScheduleController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $schedule = Schedule::findOrFail($id);
+        $this->authorize('update', $schedule);
+
+        $validator = Validator::make($request->all(), [
+            'date' => 'required|date_format:Y-m-d',
+            'building_id' => 'required|exists:buildings,id',
+            'work_order_id' => 'required|exists:work_orders,id',
+            'estimate' => 'required|string',
+            'engineer' => 'required|array',
+            'engineer.*' => 'required|string',
+        ]);
+
+        if($validator->fails()){
+            return response()->json([
+                'status' => false,
+                'message' => 'Fields Required',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $schedule->building_id = $request->building_id;
+            $schedule->date = $request->date;
+            $schedule->time = $request->time;
+            $schedule->estimate = $request->estimate;
+            $schedule->shift = $request->shift;
+            $schedule->description = $request->description;
+            $schedule->type = 'Corrective';
+            $schedule->submit = 'Y';
+            $schedule->update();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed update corrective schedule',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        $schedule->corrective()->delete();
+
+        try {
+            $corrective_schedule = new CorrectiveSchedule;
+            $corrective_schedule->schedule_id = $schedule->id;
+            $corrective_schedule->work_order_id = $request->work_order_id;
+            $corrective_schedule->save();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed add corrective schedule',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        $schedule->teams()->delete();
+
+        foreach($request->engineer as $key => $val){
+            try {
+                $team = new Team;
+                $team->schedule_id = $schedule->id;
+                $team->engineer_id = $val;
+                $team->save();
+            } catch (\Exception $e) {
+                DB::rollback();
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Failed add teams',
+                    'error' => $e->getMessage()
+                ], 500);
+            }
+        }
+
+        try {
+            $log = new Log;
+            $log->user_id = Auth::id();
+            $log->description = 'Update Corrective Schedule #'.$schedule->id;
+            $log->reference_id = $schedule->id;
+            $log->url = '#/corrective_schedule/'.$schedule->id;
+
+            $log->save();
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Failed add log',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        DB::commit();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Success update schedule',
+            'results' => $schedule,
+        ], 200);
     }
 
     /**
