@@ -27,7 +27,7 @@ class AnalyticController extends Controller
             case 'ADMINISTRATOR' :
                 $preventives = PreventiveReport::select(
                     DB::raw('COUNT(id) AS totalPreventiveKey'),
-                    DB::raw('MONTH(date) AS monthKey'),
+                    DB::raw('MONTH(date) AS monthKey')
                 )
                 ->whereYear('date', '=', $year)
                 ->groupBy('monthKey')
@@ -35,7 +35,7 @@ class AnalyticController extends Controller
 
                 $correctives = CorrectiveReport::select(
                     DB::raw('COUNT(id) AS totalCorrectiveKey'),
-                    DB::raw('MONTH(date) AS monthKey'),
+                    DB::raw('MONTH(date) AS monthKey')
                 )
                 ->whereYear('date', '=', $year)
                 ->groupBy('monthKey')
@@ -47,7 +47,7 @@ class AnalyticController extends Controller
 
                 $preventives = PreventiveReport::select(
                     DB::raw('COUNT(preventive_reports.id) AS totalPreventiveKey'),
-                    DB::raw('MONTH(preventive_reports.date) AS monthKey'),
+                    DB::raw('MONTH(preventive_reports.date) AS monthKey')
                 )
                 ->join('equipments', 'equipments.id' , '=', 'preventive_reports.equipment_id')
                 ->join('buildings', 'buildings.id' , '=', 'equipments.building_id')
@@ -59,7 +59,7 @@ class AnalyticController extends Controller
 
                 $correctives = CorrectiveReport::select(
                     DB::raw('COUNT(corrective_reports.id) AS totalCorrectiveKey'),
-                    DB::raw('MONTH(corrective_reports.date) AS monthKey'),
+                    DB::raw('MONTH(corrective_reports.date) AS monthKey')
                 )
                 ->join('equipments', 'equipments.id' , '=', 'corrective_reports.equipment_id')
                 ->join('buildings', 'buildings.id' , '=', 'equipments.building_id')
